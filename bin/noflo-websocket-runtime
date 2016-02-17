@@ -4,6 +4,9 @@ var program = require('commander');
 var http = require('http');
 var path = require('path');
 var runtime = require('../runtime/network');
+var https = require('https');
+var fs = require('fs');
+
 
 program
   .option('--host <hostname>', 'Host', String, 'localhost')
@@ -14,10 +17,25 @@ program
 
 var baseDir = process.env.PROJECT_HOME || process.cwd();
 
-var server = http.createServer(function () {});
+var server = undefined;
+
+if (program.certs)
+{
+  var options =
+      {
+        key:  fs.readFileSync(program.certs + '/privkey.pem'),
+        cert: fs.readFileSync(program.certs + '/fullchain.pem'),
+        ca:   fs.readFileSync(program.certs + '/chain.pem')
+      };
+  server = https.createServer(options, function () {});
+}
+else
+{
+  server = http.createServer(function () {});
+}
 
 var permissions = {};
-var defaultPermissions = program.permissions.split(',')
+var defaultPermissions = program.permissions.split(',');
 if (program.secret) {
   permissions[program.secret] = defaultPermissions;
   defaultPermissions = [];
@@ -32,7 +50,7 @@ var rt = runtime(server, {
 });
 
 server.listen(program.port, function () {
-  var address = 'ws://' + program.host + ':' + program.port;
+  var address = program.certs ? 'wss://' + program.host + ':' + program.port : 'wss://' + program.host + ':' + program.port;
   console.log('NoFlo runtime ' + rt.version + ' listening at ' + address);
   console.log('Using ' + baseDir + ' for component loading');
   console.log('Default permissions are ' + rt.getPermitted().join(', '));
